@@ -1,1 +1,140 @@
+* {
+  box-sizing: border-box;
+}
 
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4f8fc;
+  color: #222;
+}
+
+.container {
+  width: 100%;
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 30px 20px 60px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.header h1 {
+  margin-bottom: 10px;
+}
+
+.header p {
+  color: #666;
+}
+
+.travel-form,
+.result-section,
+.saved-section {
+  background: white;
+  padding: 25px;
+  margin-top: 20px;
+  border-radius: 18px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+h2 {
+  margin-top: 0;
+}
+
+.form-group {
+  margin-top: 18px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 15px;
+  background: white;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.budget-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.budget-input input {
+  flex: 1;
+}
+
+.budget-input span {
+  font-weight: bold;
+}
+
+button {
+  width: 100%;
+  margin-top: 25px;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  background: #4f7cff;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#result,
+#savedTrips {
+  margin-top: 15px;
+  line-height: 1.6;
+}
+
+.trip-card {
+  padding: 18px;
+  margin-top: 15px;
+  background: #f8faff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.day-card {
+  padding: 15px;
+  margin-top: 15px;
+  border-radius: 12px;
+  background: #f8f8f8;
+}
+
+.cost-card {
+  padding: 15px;
+  margin-top: 15px;
+  background: #fffaf0;
+  border-radius: 12px;
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
