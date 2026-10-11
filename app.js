@@ -32,7 +32,6 @@ loadTrips();
 // ========================================
 
 generateBtn.addEventListener("click", async () => {
-
   const destination =
     document.getElementById("destination").value.trim();
 
@@ -51,28 +50,21 @@ generateBtn.addEventListener("click", async () => {
 
   // 입력값 확인
   if (!destination) {
-    result.innerHTML = `
-      <p>📍 여행지를 입력해주세요.</p>
-    `;
+    result.textContent = "📍 여행지를 입력해주세요.";
     return;
   }
 
-  if (!budget || budget <= 0) {
-    result.innerHTML = `
-      <p>💰 예상 예산을 입력해주세요.</p>
-    `;
+  if (!Number.isFinite(budget) || budget <= 0) {
+    result.textContent = "💰 올바른 예상 예산을 입력해주세요.";
     return;
   }
 
 
   try {
-
     generateBtn.disabled = true;
 
-    result.innerHTML = `
-      <p>🤖 ${destination} 여행 계획을 만드는 중...</p>
-      <p>잠시만 기다려주세요.</p>
-    `;
+    result.textContent =
+      `🤖 ${destination} 여행 계획을 만드는 중입니다. 잠시 기다려주세요...`;
 
 
     // ========================================
@@ -94,15 +86,19 @@ generateBtn.addEventListener("click", async () => {
       );
 
 
+    // 오류가 발생하면 서버의 상세 응답 확인
     if (error) {
+      const detail = await getFunctionErrorDetail(error);
+
       throw new Error(
-        `AI 여행 계획 생성 실패: ${error.message}`
+        `AI 여행 계획 생성 실패: ${detail}`
       );
     }
 
 
     if (!data || !data.trip) {
       throw new Error(
+        data?.error ||
         "AI 여행 계획 결과를 받지 못했습니다."
       );
     }
@@ -128,28 +124,26 @@ generateBtn.addEventListener("click", async () => {
     // Supabase DB 저장
     // ========================================
 
-    const totalEstimate =
-      getTotalEstimate(trip);
+    const totalEstimate = getTotalEstimate(trip);
 
-    const { error: dbError } =
-      await supabaseClient
-        .from("trips")
-        .insert({
-          destination: destination,
-          nights: nights,
-          people: people,
-          style: style,
-          budget: budget,
-          total_estimate: totalEstimate,
-          itinerary: trip.itinerary || [],
-          packing_list: trip.packingList || [],
-          travel_tips: trip.tips || []
-        });
+    const { error: dbError } = await supabaseClient
+      .from("trips")
+      .insert({
+        destination,
+        nights,
+        people,
+        style,
+        budget,
+        total_estimate: totalEstimate,
+        itinerary: trip.itinerary || [],
+        packing_list: trip.packingList || [],
+        travel_tips: trip.tips || []
+      });
 
 
     if (dbError) {
       throw new Error(
-        `여행 계획 저장 실패: ${dbError.message}`
+        `여행 계획은 생성됐지만 저장하지 못했습니다: ${dbError.message}`
       );
     }
 
@@ -159,20 +153,49 @@ generateBtn.addEventListener("click", async () => {
 
 
   } catch (error) {
+    console.error("TravelAI 오류:", error);
 
-    console.error(error);
-
-    result.innerHTML = `
-      <p>❌ ${error.message}</p>
-    `;
+    result.textContent = `❌ ${error.message}`;
 
   } finally {
-
     generateBtn.disabled = false;
+  }
+});
 
+
+// ========================================
+// Edge Function 오류 상세 내용 확인
+// ========================================
+
+async function getFunctionErrorDetail(error) {
+  let detail = error.message || "원인을 확인할 수 없는 오류입니다.";
+  const response = error.context;
+
+  if (response && typeof response.clone === "function") {
+    try {
+      const body = await response.clone().json();
+
+      detail =
+        body.error ||
+        body.message ||
+        body.msg ||
+        JSON.stringify(body);
+
+    } catch {
+      try {
+        detail = await response.clone().text();
+      } catch {
+        // 응답 본문을 읽지 못하면 기본 오류 메시지 사용
+      }
+    }
+
+    if (response.status) {
+      detail = `HTTP ${response.status}: ${detail}`;
+    }
   }
 
-});
+  return detail;
+}
 
 
 // ========================================
@@ -180,26 +203,21 @@ generateBtn.addEventListener("click", async () => {
 // ========================================
 
 function renderTrip(trip, info) {
-
   const summary =
     trip.summary || "AI가 생성한 여행 계획입니다.";
-
 
   const itinerary =
     Array.isArray(trip.itinerary)
       ? trip.itinerary
       : [];
 
-
   const costs =
     trip.estimatedCosts || {};
-
 
   const packingList =
     Array.isArray(trip.packingList)
       ? trip.packingList
       : [];
-
 
   const tips =
     Array.isArray(trip.tips)
@@ -208,118 +226,72 @@ function renderTrip(trip, info) {
 
 
   result.innerHTML = `
-
     <div class="trip-card">
+      <h3>✈️ ${escapeHTML(info.destination)}</h3>
 
-      <h3>✈️ ${info.destination}</h3>
-
-      <p>
-        <strong>여행 기간:</strong>
+      <p><strong>여행 기간:</strong>
         ${info.nights}박 ${info.nights + 1}일
       </p>
 
-      <p>
-        <strong>여행 인원:</strong>
+      <p><strong>여행 인원:</strong>
         ${info.people}명
       </p>
 
-      <p>
-        <strong>여행 스타일:</strong>
-        ${info.style}
+      <p><strong>여행 스타일:</strong>
+        ${escapeHTML(info.style)}
       </p>
 
-      <p>
-        <strong>예산:</strong>
+      <p><strong>예산:</strong>
         ${info.budget.toLocaleString()}만원
       </p>
 
       <hr>
 
       <h3>📝 여행 요약</h3>
-
-      <p>
-        ${summary}
-      </p>
-
+      <p>${escapeHTML(summary)}</p>
     </div>
 
 
-    <!-- 일정 -->
-
     <div class="trip-card">
-
       <h3>📅 날짜별 일정</h3>
 
       ${
         itinerary.length > 0
           ? itinerary.map((day, index) => `
-
               <div class="day-card">
-
-                <h3>
-                  DAY ${day.day || index + 1}
-                </h3>
+                <h3>DAY ${escapeHTML(day.day || index + 1)}</h3>
 
                 ${
                   day.title
-                    ? `<h4>${day.title}</h4>`
+                    ? `<h4>${escapeHTML(day.title)}</h4>`
                     : ""
                 }
 
                 ${
                   Array.isArray(day.activities)
-                    ? `
-                      ${day.activities
-                        .map(
-                          (activity) => `
-                            <p>
-                              <strong>
-                                ${activity.time || ""}
-                              </strong>
-                              ${
-                                activity.place
-                                  ? ` ${activity.place}`
-                                  : ""
-                              }
-                            </p>
-
-                            ${
-                              activity.description
-                                ? `
-                                  <p>
-                                    ${activity.description}
-                                  </p>
-                                `
-                                : ""
-                            }
-                          `
-                        )
-                        .join("")}
-                    `
-                    : `
-                      <p>
-                        ${typeof day === "string" ? day : ""}
-                      </p>
-                    `
+                    ? day.activities.map((activity) => `
+                        <p>
+                          <strong>${escapeHTML(activity.time || "")}</strong>
+                          ${escapeHTML(activity.place || "")}
+                        </p>
+                        ${
+                          activity.description
+                            ? `<p>${escapeHTML(activity.description)}</p>`
+                            : ""
+                        }
+                      `).join("")
+                    : typeof day === "string"
+                      ? `<p>${escapeHTML(day)}</p>`
+                      : ""
                 }
-
               </div>
-
             `).join("")
-          : `
-            <p>
-              AI 일정 정보를 불러오지 못했습니다.
-            </p>
-          `
+          : "<p>일정 정보가 없습니다.</p>"
       }
-
     </div>
 
 
-    <!-- 예상 경비 -->
-
     <div class="trip-card">
-
       <h3>💰 예상 여행 경비</h3>
 
       ${renderCost("✈️ 항공권", costs.airfare)}
@@ -332,83 +304,58 @@ function renderTrip(trip, info) {
 
       ${
         costs.total
-          ? `
-            <hr>
-
-            <h3>
-              총 예상 비용:
-              ${costs.total}
-            </h3>
-          `
+          ? `<hr><h3>총 예상 비용: ${escapeHTML(costs.total)}</h3>`
           : ""
       }
 
+      <p>※ 실제 비용은 여행 날짜와 예약 조건에 따라 달라질 수 있습니다.</p>
     </div>
 
 
-    <!-- 준비물 -->
-
     <div class="trip-card">
-
       <h3>🎒 준비물</h3>
 
       ${
         packingList.length > 0
-          ? `
-            <ul>
-              ${packingList
-                .map(
-                  (item) => `<li>${item}</li>`
-                )
-                .join("")}
-            </ul>
-          `
-          : `
-            <p>
-              추천 준비물이 없습니다.
-            </p>
-          `
+          ? `<ul>${packingList.map(item =>
+              `<li>${escapeHTML(item)}</li>`
+            ).join("")}</ul>`
+          : "<p>추천 준비물이 없습니다.</p>"
       }
-
     </div>
 
 
-    <!-- 여행 팁 -->
-
     <div class="trip-card">
-
       <h3>💡 여행 팁</h3>
 
       ${
         tips.length > 0
-          ? `
-            <ul>
-              ${tips
-                .map(
-                  (tip) => `<li>${tip}</li>`
-                )
-                .join("")}
-            </ul>
-          `
-          : `
-            <p>
-              여행 팁이 없습니다.
-            </p>
-          `
+          ? `<ul>${tips.map(tip =>
+              `<li>${escapeHTML(tip)}</li>`
+            ).join("")}</ul>`
+          : "<p>여행 팁이 없습니다.</p>"
       }
-
     </div>
-
   `;
 }
 
 
 // ========================================
-// 경비 한 줄 표시
+// HTML에 표시할 텍스트 처리
+// ========================================
+
+function escapeHTML(value) {
+  const element = document.createElement("span");
+  element.textContent = String(value ?? "");
+  return element.innerHTML;
+}
+
+
+// ========================================
+// 예상 경비 한 줄 표시
 // ========================================
 
 function renderCost(label, value) {
-
   if (
     value === undefined ||
     value === null ||
@@ -420,7 +367,7 @@ function renderCost(label, value) {
   return `
     <p>
       <strong>${label}</strong>
-      ${value}
+      ${escapeHTML(value)}
     </p>
   `;
 }
@@ -431,20 +378,15 @@ function renderCost(label, value) {
 // ========================================
 
 function getTotalEstimate(trip) {
-
   if (
     trip.estimatedCosts &&
     trip.estimatedCosts.total
   ) {
-    return String(
-      trip.estimatedCosts.total
-    );
+    return String(trip.estimatedCosts.total);
   }
 
   if (trip.totalEstimate) {
-    return String(
-      trip.totalEstimate
-    );
+    return String(trip.totalEstimate);
   }
 
   return "AI 예상 비용";
@@ -456,84 +398,54 @@ function getTotalEstimate(trip) {
 // ========================================
 
 async function loadTrips() {
-
-  const { data, error } =
-    await supabaseClient
-      .from("trips")
-      .select("*")
-      .order("created_at", {
-        ascending: false
-      });
+  const { data, error } = await supabaseClient
+    .from("trips")
+    .select("*")
+    .order("created_at", {
+      ascending: false
+    });
 
 
   if (error) {
+    console.error("여행 목록 조회 오류:", error);
 
-    console.error(error);
-
-    savedTrips.innerHTML = `
-      <p>
-        여행 계획을 불러오지 못했습니다.
-      </p>
-    `;
+    savedTrips.textContent =
+      `여행 계획을 불러오지 못했습니다: ${error.message}`;
 
     return;
   }
 
 
   if (!data || data.length === 0) {
-
-    savedTrips.innerHTML = `
-      <p>
-        아직 저장된 여행 계획이 없습니다.
-      </p>
-    `;
+    savedTrips.textContent =
+      "아직 저장된 여행 계획이 없습니다.";
 
     return;
   }
 
 
-  savedTrips.innerHTML = `
+  savedTrips.innerHTML = data.map((trip) => `
+    <div class="trip-card">
+      <h3>✈️ ${escapeHTML(trip.destination)}</h3>
 
-    ${data.map((trip) => `
+      <p>
+        ${trip.nights}박 ${Number(trip.nights) + 1}일
+      </p>
 
-      <div class="trip-card">
+      <p>👥 ${trip.people}명</p>
 
-        <h3>
-          ✈️ ${trip.destination}
-        </h3>
+      <p>🌍 ${escapeHTML(trip.style)}</p>
 
-        <p>
-          ${trip.nights}박
-          ${Number(trip.nights) + 1}일
-        </p>
+      <p>
+        💰 예산:
+        ${Number(trip.budget).toLocaleString()}만원
+      </p>
 
-        <p>
-          👥 ${trip.people}명
-        </p>
-
-        <p>
-          🌍 ${trip.style}
-        </p>
-
-        <p>
-          💰 예산:
-          ${Number(trip.budget).toLocaleString()}만원
-        </p>
-
-        ${
-          trip.total_estimate
-            ? `
-              <p>
-                예상 비용:
-                ${trip.total_estimate}
-              </p>
-            `
-            : ""
-        }
-
-      </div>
-
-    `).join("")}
-
-  `;
+      ${
+        trip.total_estimate
+          ? `<p>예상 비용: ${escapeHTML(trip.total_estimate)}</p>`
+          : ""
+      }
+    </div>
+  `).join("");
 }
