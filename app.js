@@ -67,10 +67,7 @@ generateBtn.addEventListener("click", async () => {
       `🤖 ${destination} 여행 계획을 만드는 중입니다. 잠시 기다려주세요...`;
 
 
-    // ========================================
     // Gemini Edge Function 호출
-    // ========================================
-
     const { data, error } =
       await supabaseClient.functions.invoke(
         "generate-trip",
@@ -86,7 +83,6 @@ generateBtn.addEventListener("click", async () => {
       );
 
 
-    // 오류가 발생하면 서버의 상세 응답 확인
     if (error) {
       const detail = await getFunctionErrorDetail(error);
 
@@ -107,10 +103,7 @@ generateBtn.addEventListener("click", async () => {
     const trip = data.trip;
 
 
-    // ========================================
     // AI 결과 화면 표시
-    // ========================================
-
     renderTrip(trip, {
       destination,
       nights,
@@ -120,10 +113,7 @@ generateBtn.addEventListener("click", async () => {
     });
 
 
-    // ========================================
     // Supabase DB 저장
-    // ========================================
-
     const totalEstimate = getTotalEstimate(trip);
 
     const { error: dbError } = await supabaseClient
@@ -148,9 +138,8 @@ generateBtn.addEventListener("click", async () => {
     }
 
 
-    // 저장된 여행 목록 새로 불러오기
+    // 저장된 여행 목록 다시 불러오기
     await loadTrips();
-
 
   } catch (error) {
     console.error("TravelAI 오류:", error);
@@ -168,7 +157,9 @@ generateBtn.addEventListener("click", async () => {
 // ========================================
 
 async function getFunctionErrorDetail(error) {
-  let detail = error.message || "원인을 확인할 수 없는 오류입니다.";
+  let detail =
+    error.message || "원인을 확인할 수 없는 오류입니다.";
+
   const response = error.context;
 
   if (response && typeof response.clone === "function") {
@@ -185,7 +176,7 @@ async function getFunctionErrorDetail(error) {
       try {
         detail = await response.clone().text();
       } catch {
-        // 응답 본문을 읽지 못하면 기본 오류 메시지 사용
+        // 기본 오류 메시지 유지
       }
     }
 
@@ -229,19 +220,23 @@ function renderTrip(trip, info) {
     <div class="trip-card">
       <h3>✈️ ${escapeHTML(info.destination)}</h3>
 
-      <p><strong>여행 기간:</strong>
+      <p>
+        <strong>여행 기간:</strong>
         ${info.nights}박 ${info.nights + 1}일
       </p>
 
-      <p><strong>여행 인원:</strong>
+      <p>
+        <strong>여행 인원:</strong>
         ${info.people}명
       </p>
 
-      <p><strong>여행 스타일:</strong>
+      <p>
+        <strong>여행 스타일:</strong>
         ${escapeHTML(info.style)}
       </p>
 
-      <p><strong>예산:</strong>
+      <p>
+        <strong>예산:</strong>
         ${info.budget.toLocaleString()}만원
       </p>
 
@@ -274,6 +269,7 @@ function renderTrip(trip, info) {
                           <strong>${escapeHTML(activity.time || "")}</strong>
                           ${escapeHTML(activity.place || "")}
                         </p>
+
                         ${
                           activity.description
                             ? `<p>${escapeHTML(activity.description)}</p>`
@@ -308,7 +304,9 @@ function renderTrip(trip, info) {
           : ""
       }
 
-      <p>※ 실제 비용은 여행 날짜와 예약 조건에 따라 달라질 수 있습니다.</p>
+      <p>
+        ※ 실제 비용은 여행 날짜와 예약 조건에 따라 달라질 수 있습니다.
+      </p>
     </div>
 
 
@@ -446,6 +444,67 @@ async function loadTrips() {
           ? `<p>예상 비용: ${escapeHTML(trip.total_estimate)}</p>`
           : ""
       }
+
+      <button
+        type="button"
+        onclick="deleteTrip(${Number(trip.id)})"
+        style="
+          background: #e74c3c;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 10px 16px;
+          margin-top: 10px;
+          cursor: pointer;
+        "
+      >
+        🗑️ 여행 계획 삭제
+      </button>
     </div>
   `).join("");
+}
+
+
+// ========================================
+// 여행 계획 삭제
+// ========================================
+
+async function deleteTrip(id) {
+  const confirmed = confirm(
+    "이 여행 계획을 정말 삭제할까요?\n삭제한 계획은 복구할 수 없습니다."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    // DB에서 선택한 여행 삭제
+    const { data, error } = await supabaseClient
+      .from("trips")
+      .delete()
+      .eq("id", id)
+      .select("id");
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // 실제 삭제 여부 확인
+    if (!data || data.length === 0) {
+      throw new Error(
+        "여행 계획이 삭제되지 않았습니다. 데이터베이스 접근 정책을 확인해주세요."
+      );
+    }
+
+    // 삭제 완료 후 목록 새로고침
+    await loadTrips();
+
+    alert("✅ 여행 계획이 삭제되었습니다.");
+
+  } catch (error) {
+    console.error("여행 삭제 오류:", error);
+
+    alert(`❌ 삭제 실패: ${error.message}`);
+  }
 }
